@@ -1,0 +1,102 @@
+name: CI (Claude Code marketplace)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate marketplace.json + plugin.json shape
+        run: |
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('.claude-plugin/marketplace.json', 'utf8'));
+            if (!m.name || !m.owner || !Array.isArray(m.plugins) || m.plugins.length === 0) {
+              throw new Error('marketplace.json missing required fields');
+            }
+            for (const p of m.plugins) {
+              if (!p.name || !p.source) throw new Error('plugin entry missing name/source: ' + JSON.stringify(p));
+            }
+            const p = JSON.parse(fs.readFileSync('plugins/qualimetry-ai-app/.claude-plugin/plugin.json', 'utf8'));
+            if (!p.name || !p.version) throw new Error('plugin.json missing name/version');
+            console.log('marketplace.json and plugin.json look OK.');
+          "
+
+      - name: Lint hook scripts (shellcheck — advisory)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck jq
+          find plugins -name '*.sh' -print0 | xargs -0 shellcheck || true
+
+      - name: Validate hooks/hooks.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const h = JSON.parse(fs.readFileSync('plugins/qualimetry-ai-app/hooks/hooks.json', 'utf8'));
+            if (!h.hooks || !h.hooks.PostToolUse) throw new Error('hooks.json missing PostToolUse');
+            console.log('hooks.json OK.');
+          "
+
+      - name: Smoke-check skills are present
+        run: |
+          for s in coding-standards review-check analysis-issues dependency-check; do
+            test -f "plugins/qualimetry-ai-app/skills/$s/SKILL.md" || (echo "Missing skill: $s" && exit 1)
+          done
+          echo "All four skills present in the plugin bundle."
+
+  release:
+    needs: validate
+    if: startsWith(github.event.head_commit.message, 'release:') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Extract marketplace + plugin versions
+        id: version
+        run: |
+          MV=$(node -p "require('./.claude-plugin/marketplace.json').plugins[0].version || ''")
+          PV=$(node -p "require('./plugins/qualimetry-ai-app/.claude-plugin/plugin.json').version")
+          echo "marketplace=$MV" >> $GITHUB_OUTPUT
+          echo "plugin=$PV" >> $GITHUB_OUTPUT
+          echo "Plugin v$PV (marketplace pin: ${MV:-from plugin})"
+
+      - name: Extract release notes (fallback to commit message)
+        run: |
+          VERSION="${{ steps.version.outputs.plugin }}"
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > release-notes.md
+          fi
+          if [ ! -s release-notes.md ]; then
+            echo "Release ${{ steps.version.outputs.plugin }}" > release-notes.md
+            echo "" >> release-notes.md
+            echo "${{ github.event.head_commit.message }}" >> release-notes.md
+          fi
+
+      # The Claude Code marketplace IS this git repo. Tagging signals release;
+      # users on /plugin marketplace update pull the new plugin version.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: v${{ steps.version.outputs.plugin }}
+          name: v${{ steps.version.outputs.plugin }}
+          body_path: release-notes.md

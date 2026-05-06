@@ -1,0 +1,17 @@
+{
+  "name": "qualimetry-ai-app",
+  "version": "1.0.0",
+  "description": "Enforces Qualimetry coding standards, principles, policies, and surfaces AI review + rules-based analysis findings.",
+  "author": {
+    "name": "Qualimetry",
+    "email": "support@qualimetry.com"
+  },
+  "homepage": "https://www.qualimetry.com",
+  "repository": "https://github.com/Qualimetry/claude-code-qualimetry-ai-app",
+  "license": "Apache-2.0",
+  "keywords": ["qualimetry", "code-review", "compliance", "mcp"],
+  "skills": "./skills",
+  "commands": "./commands",
+  "agents": "./agents",
+  "hooks": "./hooks/hooks.json"
+}

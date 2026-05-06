@@ -1,0 +1,21 @@
+{
+  "name": "qualimetry-ai",
+  "owner": {
+    "name": "Qualimetry",
+    "email": "support@qualimetry.com"
+  },
+  "description": "Qualimetry AI App: enforces coding standards, principles, policies, and surfaces AI review and rules-based analysis findings inside Claude Code.",
+  "plugins": [
+    {
+      "name": "qualimetry-ai-app",
+      "source": "./plugins/qualimetry-ai-app",
+      "description": "Bundles the four Qualimetry skills (coding-standards, review-check, analysis-issues, dependency-check), registers the Qualimetry MCP server, adds /compliance-* slash commands, a compliance-reviewer subagent, and a PostToolUse hook that surfaces review findings the moment a reviewed file is opened.",
+      "homepage": "https://www.qualimetry.com",
+      "repository": "https://github.com/Qualimetry/claude-code-qualimetry-ai-app",
+      "license": "Apache-2.0",
+      "keywords": ["qualimetry", "code-review", "coding-standards", "compliance", "mcp"],
+      "category": "Code Quality",
+      "tags": ["compliance", "review", "standards", "policies", "sonar"]
+    }
+  ]
+}
